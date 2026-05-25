@@ -1,0 +1,68 @@
+name: Model Evaluation
+
+on:
+  push:
+    paths:
+      - "src/training/**"
+      - "src/preprocessing/**"
+      - "data/processed/**"
+  pull_request:
+    paths:
+      - "src/training/**"
+      - "src/preprocessing/**"
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Train baseline model
+        run: python src/training/train_baseline.py
+
+      - name: Run evaluation and capture output
+        run: |
+          python src/evaluation/evaluate.py --mode baseline 2>&1 | tee eval_output.txt
+
+      - name: Post metrics as PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const output = fs.readFileSync('eval_output.txt', 'utf8');
+            const body = `## 🤖 Model Evaluation Results\n\`\`\`\n${output.slice(0, 3000)}\n\`\`\``;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+
+      - name: Quality gate — held-out accuracy must be above threshold
+        run: |
+          python -c "
+          import json, sys
+          try:
+              m = json.load(open('models/metrics_baseline.json'))
+              acc = m['phase_held']['accuracy']
+              threshold = 0.55
+              print(f'Held-out accuracy: {acc:.3f} (threshold: {threshold})')
+              if acc < threshold:
+                  print(f'FAIL: accuracy {acc:.3f} < {threshold}')
+                  sys.exit(1)
+              print('PASS: quality gate met')
+          except Exception as e:
+              print(f'Could not load metrics: {e}')
+              sys.exit(1)
+          "
