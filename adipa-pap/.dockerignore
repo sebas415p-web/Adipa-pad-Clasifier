@@ -1,0 +1,28 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*.egg-info
+venv/
+.venv/
+
+# Datos crudos (grandes, van a DVC)
+data/raw/
+
+# Secretos
+.env
+.env.local
+
+# Dev
+.pytest_cache/
+htmlcov/
+coverage.xml
+notebooks/
+.pre-commit-config.yaml
+
+# OS
+.DS_Store
+Thumbs.db
